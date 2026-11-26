@@ -575,6 +575,8 @@ class WCAL_REST_Carts_Controller extends WCAL_REST_Settings_Controller {
 			'status'                  => $recovered_id > 0 ? 'recovered' : ( '1' === (string) $row->cart_ignored ? 'abandoned_new' : 'abandoned' ),
 			'unsubscribed'            => '1' === (string) $row->unsubscribe_link,
 			'recovered'               => $recovered,
+			'ip_address'              => isset( $row->ip_address ) ? (string) $row->ip_address : '',
+			'user_agent'              => isset( $row->user_agent ) ? (string) $row->user_agent : '',
 		);
 	}
 

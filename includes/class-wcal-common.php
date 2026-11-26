@@ -932,6 +932,98 @@ class wcal_common { // phpcs:ignore
 	}
 
 	/**
+	 * IP address of the visitor making the current request.
+	 *
+	 * Uses WooCommerce's own lookup (the same one WooCommerce uses for the
+	 * customer IP saved on orders), then falls back to REMOTE_ADDR.
+	 *
+	 * @return string Valid IPv4/IPv6 address, or empty string.
+	 */
+	public static function wcal_get_visitor_ip() {
+		$ip = '';
+		if ( class_exists( 'WC_Geolocation' ) && method_exists( 'WC_Geolocation', 'get_ip_address' ) ) {
+			$ip = WC_Geolocation::get_ip_address();
+		}
+		if ( '' === $ip && isset( $_SERVER['REMOTE_ADDR'] ) ) {
+			$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		}
+		$ip = apply_filters( 'wcal_client_ip_address', $ip );
+		return filter_var( $ip, FILTER_VALIDATE_IP ) ? (string) $ip : '';
+	}
+
+	/**
+	 * User agent of the browser making the current request.
+	 *
+	 * @return string Sanitized user agent (max 1000 chars), or empty string.
+	 */
+	public static function wcal_get_client_user_agent() {
+		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+		$user_agent = apply_filters( 'wcal_client_user_agent', $user_agent );
+		return substr( (string) $user_agent, 0, 1000 );
+	}
+
+	/**
+	 * Save the current visitor's IP address and user agent on an abandoned cart record.
+	 *
+	 * Works for registered users, guests and visitors. Runs one small UPDATE only when
+	 * the values for this cart changed since the last save in this WC session, so the
+	 * frequent cart hooks don't add a query on every page load.
+	 *
+	 * @param string     $column Column identifying the cart: id, user_id or session_id.
+	 * @param int|string $value  Value of that column.
+	 */
+	public static function wcal_save_ip_user_agent( $column, $value ) {
+		global $wpdb;
+
+		if ( 'yes' !== get_option( 'wcal_ip_ua_columns_added' ) ) {
+			return; // Columns not added yet; never risk breaking cart capture.
+		}
+		if ( ! in_array( $column, array( 'id', 'user_id', 'session_id' ), true ) || empty( $value ) ) {
+			return;
+		}
+		if ( is_admin() && ! wp_doing_ajax() ) {
+			return; // Only record the shopper's own requests.
+		}
+
+		$ip_address = self::wcal_get_visitor_ip();
+		$user_agent = self::wcal_get_client_user_agent();
+		if ( '' === $ip_address && '' === $user_agent ) {
+			return;
+		}
+
+		$signature = md5( $column . '|' . $value . '|' . $ip_address . '|' . $user_agent );
+		$session   = ( function_exists( 'WC' ) && isset( WC()->session ) && WC()->session ) ? WC()->session : null;
+		if ( $session && $session->get( 'wcal_ip_ua_saved' ) === $signature ) {
+			return;
+		}
+
+		$table = $wpdb->prefix . 'ac_abandoned_cart_history_lite';
+		if ( 'id' === $column ) {
+			$wpdb->query( // phpcs:ignore
+				$wpdb->prepare(
+					"UPDATE `$table` SET ip_address = %s, user_agent = %s WHERE id = %d", // phpcs:ignore
+					$ip_address,
+					$user_agent,
+					(int) $value
+				)
+			);
+		} else {
+			$wpdb->query( // phpcs:ignore
+				$wpdb->prepare(
+					"UPDATE `$table` SET ip_address = %s, user_agent = %s WHERE `$column` = %s AND cart_ignored = '0' AND recovered_cart = 0", // phpcs:ignore
+					$ip_address,
+					$user_agent,
+					(string) $value
+				)
+			);
+		}
+
+		if ( $session ) {
+			$session->set( 'wcal_ip_ua_saved', $signature );
+		}
+	}
+
+	/**
 	 * Update Checkout Link in cart history table.
 	 *
 	 * @param int $cart_id - Cart ID.

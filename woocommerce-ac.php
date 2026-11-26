@@ -242,6 +242,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 			// Update the options as per settings API.
 			add_action( 'admin_init', array( 'Wcal_Update', 'wcal_schedule_update_action' ) );
 			add_action( 'wcal_update_db', array( 'Wcal_Update', 'wcal_update_db_check' ) );
+			// Make sure the IP address / user agent columns exist (runs once per site, then a single option check).
+			add_action( 'init', array( 'Wcal_Update', 'wcal_maybe_add_ip_ua_columns' ), 5 );
 
 			// WordPress settings API.
 			add_action( 'admin_init', array( &$this, 'wcal_initialize_plugin_options' ) );
@@ -745,6 +747,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 				`session_id` varchar(50) COLLATE utf8_unicode_ci NOT NULL,
 				`email_reminder_status` varchar(50) COLLATE utf8_unicode_ci NOT NULL,
 				`checkout_link` varchar(500) COLLATE utf8_unicode_ci NOT NULL,
+				`ip_address` varchar(45) NOT NULL DEFAULT '',
+				`user_agent` text NULL,
 				PRIMARY KEY (`id`),
 				KEY `session_id` (`session_id`)
 				) $wcap_collate" // phpcs:ignore
@@ -1621,6 +1625,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 							);
 							$abandoned_cart_id = $wpdb->insert_id;
 							wcal_common::wcal_set_cart_session( 'abandoned_cart_id_lite', $abandoned_cart_id );
+							wcal_common::wcal_save_ip_user_agent( 'id', $abandoned_cart_id );
 							wcal_common::wcal_add_checkout_link( $abandoned_cart_id );
 							wcal_common::wcal_run_webhook_after_cutoff( $abandoned_cart_id );
 						}
@@ -1653,6 +1658,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 
 							$abandoned_cart_id = $wpdb->insert_id;
 							wcal_common::wcal_set_cart_session( 'abandoned_cart_id_lite', $abandoned_cart_id );
+							wcal_common::wcal_save_ip_user_agent( 'id', $abandoned_cart_id );
 							wcal_common::wcal_add_checkout_link( $abandoned_cart_id );
 							wcal_common::wcal_run_webhook_after_cutoff( $abandoned_cart_id );
 						} else {
@@ -1684,6 +1690,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 						if ( count( $get_abandoned_record ) > 0 ) {
 							$abandoned_cart_id = $get_abandoned_record[0]->id;
 							wcal_common::wcal_set_cart_session( 'abandoned_cart_id_lite', $abandoned_cart_id );
+							wcal_common::wcal_save_ip_user_agent( 'id', $abandoned_cart_id );
 							wcal_common::wcal_add_checkout_link( $abandoned_cart_id );
 							wcal_common::wcal_run_webhook_after_cutoff( $abandoned_cart_id );
 						}
@@ -1767,6 +1774,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 										$results[0]->checkout_link
 									)
 								);
+								wcal_common::wcal_save_ip_user_agent( 'id', $wpdb->insert_id );
 								update_user_meta( $user_id, '_woocommerce_ac_modified_cart', md5( 'yes' ) );
 							} else {
 								update_user_meta( $user_id, '_woocommerce_ac_modified_cart', md5( 'no' ) );
@@ -1781,6 +1789,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 									0
 								)
 							);
+							wcal_common::wcal_save_ip_user_agent( 'user_id', $user_id );
 						}
 					} else {
 						// Here we capture the guest cart from the cart page @since 3.5.
@@ -1809,6 +1818,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 										)
 									);
 									$abandoned_cart_id = $wpdb->insert_id;
+									wcal_common::wcal_save_ip_user_agent( 'id', $abandoned_cart_id );
 								}
 							} elseif ( $compare_time > $results[0]->abandoned_cart_time ) {
 								$blank_cart_info = '[]';
@@ -1833,6 +1843,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 											)
 										);
 										$abandoned_cart_id = $wpdb->insert_id;
+										wcal_common::wcal_save_ip_user_agent( 'id', $abandoned_cart_id );
 									}
 								}
 							} else {
@@ -1849,6 +1860,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 											)
 										);
 									}
+									// Also fills in IP / user agent for visitor carts saved before this was added.
+									wcal_common::wcal_save_ip_user_agent( 'session_id', $get_cookie );
 								}
 							}
 							if ( isset( $abandoned_cart_id ) ) {

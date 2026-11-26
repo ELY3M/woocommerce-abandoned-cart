@@ -168,6 +168,8 @@ if ( ! class_exists( 'Wcal_Personal_Data_Eraser' ) ) {
 				'wcal_privacy_remove_cart_personal_data_props',
 				array(
 					'session_id' => 'numeric_id',
+					'ip_address' => 'ip',
+					'user_agent' => 'text',
 				),
 				$abandoned_id
 			);
@@ -189,7 +191,7 @@ if ( ! class_exists( 'Wcal_Personal_Data_Eraser' ) ) {
 				// get the data from cart history.
 				$cart_details = $wpdb->get_results( // phpcs:ignore
 					$wpdb->prepare(
-						'SELECT session_id, user_type, user_id FROM `' . $wpdb->prefix . 'ac_abandoned_cart_history_lite` WHERE id = %d',
+						'SELECT * FROM `' . $wpdb->prefix . 'ac_abandoned_cart_history_lite` WHERE id = %d',
 						$abandoned_id
 					)
 				);

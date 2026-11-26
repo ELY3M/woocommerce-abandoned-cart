@@ -296,6 +296,42 @@ if ( ! class_exists( 'Wcal_Update' ) ) {
 			}
 		}
 		/**
+		 * Add the ip_address and user_agent columns to the abandoned cart history table.
+		 *
+		 * Hooked to init so it runs on existing installs without needing a version bump.
+		 * After success it is a single (autoloaded) option check per request. Works per
+		 * site on multisite because $wpdb->prefix and get_option() follow the current blog.
+		 */
+		public static function wcal_maybe_add_ip_ua_columns() {
+			global $wpdb;
+
+			if ( 'yes' === get_option( 'wcal_ip_ua_columns_added' ) ) {
+				return;
+			}
+			if ( get_transient( 'wcal_ip_ua_columns_retry' ) ) {
+				return; // A previous attempt failed; don't hammer the DB on every request.
+			}
+
+			$table = $wpdb->prefix . 'ac_abandoned_cart_history_lite';
+			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) { // phpcs:ignore
+				return;
+			}
+
+			if ( ! $wpdb->get_var( "SHOW COLUMNS FROM `{$table}` LIKE 'ip_address'" ) ) { // phpcs:ignore
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `ip_address` varchar(45) NOT NULL DEFAULT '' AFTER `checkout_link`" ); // phpcs:ignore
+			}
+			if ( ! $wpdb->get_var( "SHOW COLUMNS FROM `{$table}` LIKE 'user_agent'" ) ) { // phpcs:ignore
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `user_agent` text NULL AFTER `ip_address`" ); // phpcs:ignore
+			}
+
+			if ( $wpdb->get_var( "SHOW COLUMNS FROM `{$table}` LIKE 'ip_address'" ) && $wpdb->get_var( "SHOW COLUMNS FROM `{$table}` LIKE 'user_agent'" ) ) { // phpcs:ignore
+				update_option( 'wcal_ip_ua_columns_added', 'yes' );
+			} else {
+				set_transient( 'wcal_ip_ua_columns_retry', 1, HOUR_IN_SECONDS );
+			}
+		}
+
+		/**
 		 * Add an index on session_id to the abandoned cart history table.
 		 *
 		 * The hot-path lookup in wcal_store_cart_timestamp() previously full-scanned

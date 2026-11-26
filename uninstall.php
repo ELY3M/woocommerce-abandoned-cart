@@ -42,6 +42,7 @@ if ( is_multisite() ) { // Multisite.
 
 			delete_blog_option( $blog_id_number, 'woocommerce_ac_email_body' );
 			delete_blog_option( $blog_id_number, 'ac_lite_cart_abandoned_time' );
+			delete_blog_option( $blog_id_number, 'wcal_ip_ua_columns_added' );
 			delete_blog_option( $blog_id_number, 'ac_lite_email_admin_on_recovery' );
 			delete_blog_option( $blog_id_number, 'ac_lite_email_admin_on_abondonment' );
 			delete_blog_option( $blog_id_number, 'ac_lite_settings_status' );
@@ -132,7 +133,7 @@ if ( is_multisite() ) { // Multisite.
 
 delete_option( 'woocommerce_ac_email_body' );
 delete_option( 'ac_lite_cart_abandoned_time' );
-delete_option( 'wcal_reminder_job_interval' );
+delete_option( 'wcal_ip_ua_columns_added' );
 delete_option( 'ac_lite_email_admin_on_recovery' );
 delete_option( 'wcap_email_admin_on_abandonment' );
 delete_option( 'ac_lite_settings_status' );
